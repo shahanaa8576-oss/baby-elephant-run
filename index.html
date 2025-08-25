@@ -3,43 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Elephant’s Dream 🐘</title>
-  <meta name="description" content="A tiny but polished runner about a cartoon baby elephant in a dreamy world with glowing pillars." />
+  <title>Elephant Runner 🐘🌳</title>
+  <meta name="description" content="A cute baby-blue elephant runs through a dreamy forest. Jump over trees, collect stars. Keyboard-friendly and mobile-ready." />
   <style>
     :root{
-      --baby-blue:#BFD9FF; /* baby elephant base */
-      --baby-blue-dark:#8EB6FF;
-      --line:#4A6DDA;
-      --glow:#8AD5FF;
-      --star:#FFE8A3;
-      --bg-top:#0b0f2a;
-      --bg-mid:#1a2150;
-      --bg-bottom:#291a4a;
-      --ui:#FFFFFF;
-      --danger:#FF7B7B;
-      --accent:#FFD166;
+      --sky1:#0b1027; --sky2:#17244a; --sky3:#1f1b3f; --ui:#fff; --accent:#ffd166; --baby:#BFD9FF;
     }
-    html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 65% 20%, rgba(120,90,255,.25), transparent 60%),
-                                     linear-gradient(180deg,var(--bg-top),var(--bg-mid) 55%,var(--bg-bottom));
-               color:var(--ui);font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;}
+    html,body{height:100%;margin:0;background:radial-gradient(1200px 900px at 70% 15%, rgba(140,110,255,.18), transparent 60%),
+                                   linear-gradient(180deg,var(--sky1),var(--sky2) 60%,var(--sky3));
+                color:var(--ui);font-family:Inter,system-ui,Segoe UI,Arial,sans-serif}
     #wrap{display:grid;place-items:center;height:100%;padding:16px}
     canvas{width:min(100vw, 960px);height:calc(min(100vw, 960px)*0.6);display:block;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.6);background:transparent}
-    .hud{position:fixed;inset:12px auto auto 12px;display:flex;gap:10px;align-items:center;user-select:none;pointer-events:none}
-    .right{left:auto;right:12px}
-    .badge{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);backdrop-filter:blur(6px);padding:6px 12px;border-radius:999px;font-size:13px}
+    .hud{position:fixed;left:12px;top:12px;display:flex;gap:10px;align-items:center;user-select:none;pointer-events:none}
+    .hud .badge{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(6px);padding:6px 12px;border-radius:999px;font-size:13px}
+    .hud-right{position:fixed;right:12px;top:12px}
+    .hud-right .badge{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(6px);padding:6px 12px;border-radius:999px;font-size:13px}
     .btnbar{position:fixed;left:0;right:0;bottom:18px;display:flex;justify-content:center;gap:16px}
     .btn{width:72px;height:72px;border-radius:16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}
     @media (min-width:900px){.btnbar{display:none}}
   </style>
 </head>
 <body>
-  <div id="wrap"><canvas id="game" width="960" height="576" aria-label="Elephant's Dream Game"></canvas></div>
+  <div id="wrap"><canvas id="game" width="960" height="576" aria-label="Elephant Runner Game"></canvas></div>
   <div class="hud">
     <div class="badge" id="scoreB">Score: 0</div>
     <div class="badge" id="bestB">Best: 0</div>
-    <div class="badge" id="tipsB">Enter to Start • Space/↑ to Jump • ← → to Move • P Pause • S Sound</div>
+    <div class="badge" id="helpB">Enter: Start • Space/↑: Jump/Hold to Float • ← →: Move • P: Pause • S: Sound</div>
   </div>
-  <div class="hud right"><div class="badge" id="stateB">Ready</div></div>
+  <div class="hud-right"><div class="badge" id="stateB">Ready</div></div>
   <div class="btnbar" id="mobileCtl">
     <button class="btn" id="leftBtn">◀︎</button>
     <button class="btn" id="jumpBtn">⤴︎</button>
@@ -48,307 +39,145 @@
 
 <script>
 /* ----------------------------------------------------
-   Elephant’s Dream – polished runner with dreamy vibes
-   - Cute BABY BLUE cartoon elephant
-   - Dreamy parallax sky, twinkling stars, nebula fog
-   - Glowing PILLARS as obstacles (soft neon)
-   - Smooth keyboard feel (coyote time + jump buffer)
-   - Mobile on-screen buttons, pause, sound toggle
-   - High score saved locally
+   Elephant Runner – Dreamy Forest
+   - Cute BABY-BLUE elephant (cartoon canvas drawing)
+   - Dreamy parallax forest (stars, mist, distant trees)
+   - Trees as obstacles (trunks + glowing canopies)
+   - Smooth keyboard: ← → move, Space/↑ jump (hold to float)
+   - Mobile buttons, pause, sound toggle, local best score
 ---------------------------------------------------- */
-const W = 960, H = 576; // internal resolution (CSS scales it)
-const c = document.getElementById('game');
-const ctx = c.getContext('2d', { alpha:true });
-const scoreEl = document.getElementById('scoreB');
-const bestEl  = document.getElementById('bestB');
-const tipsEl  = document.getElementById('tipsB');
-const stateEl = document.getElementById('stateB');
+const W=960,H=576; const c=document.getElementById('game'); const ctx=c.getContext('2d',{alpha:true});
+const scoreEl=document.getElementById('scoreB'); const bestEl=document.getElementById('bestB'); const helpEl=document.getElementById('helpB'); const stateEl=document.getElementById('stateB');
 
-// Audio: tiny oscillator beeps (no external files)
-const SFX = (()=>{ let ac; const ensure=()=>ac||(ac=new (window.AudioContext||window.webkitAudioContext)());
-  function beep(f=440,t=.08,type='sine',g=.05){const a=ensure();const o=a.createOscillator();const gn=a.createGain();o.type=type;o.frequency.value=f;gn.gain.value=g;o.connect(gn);gn.connect(a.destination);o.start();o.stop(a.currentTime+t);} 
-  return { beep, on(){ensure()}, active(){return !!ac} };
-})();
+// Tiny built-in audio
+const SFX=(()=>{ let ac; const ensure=()=>ac||(ac=new (window.AudioContext||window.webkitAudioContext)());
+  function beep(f=440,t=.08,type='sine',g=.05){const a=ensure();const o=a.createOscillator();const gn=a.createGain();o.type=type;o.frequency.value=f;gn.gain.value=g;o.connect(gn);gn.connect(a.destination);o.start();o.stop(a.currentTime+t);} return{beep,on(){ensure()},active(){return!!ac}};})();
 
-// Helpers
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const rand=(a,b)=>a+Math.random()*(b-a);
-const chance=p=>Math.random()<p;
+// Utilities
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)); const rand=(a,b)=>a+Math.random()*(b-a);
 
 // Input
-const keys = {left:false,right:false,jump:false};
-let jumpPressedAt = -1; // jump buffer timer
-let paused=false, playing=false, over=false;
-
-window.addEventListener('keydown', e=>{
-  if(e.repeat) return;
-  const k=e.key.toLowerCase();
-  if(k==='arrowleft'||k==='a') keys.left=true;
-  if(k==='arrowright'||k==='d') keys.right=true;
-  if(k===' '||k==='arrowup'||k==='w') { keys.jump=true; jumpPressedAt = performance.now(); }
-  if(k==='enter') { if(!playing||over) start(); }
-  if(k==='p') { if(playing&&!over) paused=!paused; stateEl.textContent = paused? 'Paused' : 'Playing'; }
-  if(k==='s') { SFX.on(); SFX.beep(880,.05,'triangle',.03); tipsEl.textContent='Sound on ✓'; setTimeout(()=>tipsEl.textContent='Space/↑ Jump • ← → Move • P Pause • S Sound',1200); }
-});
-window.addEventListener('keyup', e=>{
-  const k=e.key.toLowerCase();
-  if(k==='arrowleft'||k==='a') keys.left=false;
-  if(k==='arrowright'||k==='d') keys.right=false;
-  if(k===' '||k==='arrowup'||k==='w') keys.jump=false;
-});
+const keys={left:false,right:false,jump:false}; let jumpPressedAt=-1; let paused=false,playing=false,over=false; 
+window.addEventListener('keydown',e=>{ if(e.repeat) return; const k=e.key.toLowerCase(); if(k==='arrowleft'||k==='a') keys.left=true; if(k==='arrowright'||k==='d') keys.right=true; if(k===' '||k==='arrowup'||k==='w'){keys.jump=true;jumpPressedAt=performance.now();} if(k==='enter'){ if(!playing||over) start(); } if(k==='p'){ if(playing&&!over){paused=!paused; stateEl.textContent=paused?'Paused':'Playing';} } if(k==='s'){ SFX.on(); SFX.beep(880,.05,'triangle',.03); helpEl.textContent='Sound on ✓'; setTimeout(()=>helpEl.textContent='Enter: Start • Space/↑: Jump/Hold to Float • ← →: Move • P: Pause • S: Sound',1200); } });
+window.addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); if(k==='arrowleft'||k==='a') keys.left=false; if(k==='arrowright'||k==='d') keys.right=false; if(k===' '||k==='arrowup'||k==='w') keys.jump=false; });
 
 // Mobile buttons
-const leftBtn=document.getElementById('leftBtn');
-const rightBtn=document.getElementById('rightBtn');
-const jumpBtn=document.getElementById('jumpBtn');
-['mousedown','touchstart'].forEach(ev=>{
-  leftBtn.addEventListener(ev,()=>keys.left=true); rightBtn.addEventListener(ev,()=>keys.right=true); jumpBtn.addEventListener(ev,()=>{keys.jump=true; jumpPressedAt=performance.now();});
-});
-['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=>{
-  leftBtn.addEventListener(ev,()=>keys.left=false); rightBtn.addEventListener(ev,()=>keys.right=false); jumpBtn.addEventListener(ev,()=>keys.jump=false);
-});
+const leftBtn=document.getElementById('leftBtn'), rightBtn=document.getElementById('rightBtn'), jumpBtn=document.getElementById('jumpBtn');
+['mousedown','touchstart'].forEach(ev=>{ leftBtn.addEventListener(ev,()=>keys.left=true); rightBtn.addEventListener(ev,()=>keys.right=true); jumpBtn.addEventListener(ev,()=>{keys.jump=true;jumpPressedAt=performance.now();}); });
+['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=>{ leftBtn.addEventListener(ev,()=>keys.left=false); rightBtn.addEventListener(ev,()=>keys.right=false); jumpBtn.addEventListener(ev,()=>keys.jump=false); });
 
-// Game state
-const groundY = H*0.78;
-let t=0, last=0, dt=0;
-let worldSpeed = 220; // scroll speed
-let score=0; let best=+localStorage.getItem('elephant_best')||0;
+// World
+const groundY=H*0.8; let t=0,last=0,dt=0; let speed=250; let score=0; let best=+localStorage.getItem('ele-run-best')||0; bestEl.textContent='Best: '+best;
+const stars=Array.from({length:120},()=>({x:rand(0,W),y:rand(0,H*0.6),s:rand(.6,1.8),tw:rand(.2,.9)}));
+const fogs=Array.from({length:6},()=>({x:rand(0,W),y:rand(40,H*.6),r:rand(130,240),v:rand(4,10)}));
+const farTrees=Array.from({length:9},()=>({x:rand(0,W),y:groundY-rand(120,220),h:rand(100,180),w:rand(18,26),s:rand(0.3,0.6)}));
 
-// Stars & fog for dreamy bg
-const stars = Array.from({length:120},()=>({x:rand(0,W),y:rand(0,H*0.7),s:rand(0.5,1.8), tw:rand(0.2,0.8)}));
-const fogs = Array.from({length:6},()=>({x:rand(0,W),y:rand(40,H*0.6),r:rand(120,240),v:rand(4,10),a:rand(0.05,0.12)}));
+// Player – cute baby-blue elephant
+const ele={x:140,y:groundY-60,w:80,h:56,vx:0,vy:0,onGround:true,jumping:false,maxX:W*0.7,acc:1800,decel:2400,maxSpeed:260,gravity:1900,jumpVel:-900, floatG:860, coyote:0,coyoteTime:100};
 
-// Player: baby elephant (cartoon), baby blue
-const ele = { x:140, y:groundY-64, w:78, h:56, vx:0, vy:0, onGround:true, canJump:true,
-              maxSpeed:260, acc:1800, decel:2200, jumpVel:-760, gravity:2000,
-              coyote:0, coyoteTime:90, jumpBuf:0, jumpBufTime:110, jumping:false };
+// Obstacles – trees (trunk + canopy glow)
+const trees=[]; let spawnTree=0; function addTree(){ const trunkW=rand(22,30), trunkH=rand(70,110); const y=groundY-trunkH; const spacing=rand(0,60); trees.push({x:W+spacing,y,w:trunkW,h:trunkH,hit:false,canopyR:rand(28,42)}); }
 
-// Obstacles: glowing pillars
-const pillars = []; let spawnTimer=0;
-function spawnPillar(){
-  // random gap height, pillar width, with glow
-  const w = rand(22, 34);
-  const h = rand(50, 120);
-  const y = groundY - h;
-  pillars.push({ x:W + rand(0,80), y, w, h, glow: rand(6, 14), hit:false });
-}
+// Stars collectibles
+const sparks=[]; let spawnSpark=0; function addSpark(){ sparks.push({x:W+rand(0,60),y:rand(groundY-160,groundY-100),r:3.5,t:0}); }
 
-// Cute collectible fireflies (bonus points, light)
-const flies = []; let flyTimer=0;
-function spawnFly(){ flies.push({x:W+rand(0,60), y:rand(groundY-160, groundY-80), r:3.5, a:rand(0.5,1), t:0}); }
-
-function reset(){
-  t=0; last=0; dt=0; score=0; worldSpeed=220; over=false; playing=false; paused=false;
-  pillars.length=0; flies.length=0;
-  ele.x=140; ele.y=groundY-64; ele.vx=0; ele.vy=0; ele.onGround=true; ele.coyote=0; ele.jumpBuf=0; ele.jumping=false;
-  spawnTimer=0; flyTimer=0;
-  stateEl.textContent='Ready'; scoreEl.textContent='Score: 0'; bestEl.textContent='Best: '+best;
-}
+function reset(){ t=0; last=0; dt=0; score=0; speed=250; over=false; playing=false; paused=false; trees.length=0; sparks.length=0; Object.assign(ele,{x:140,y:groundY-60,vx:0,vy:0,onGround:true,jumping:false}); stateEl.textContent='Ready'; scoreEl.textContent='Score: 0'; helpEl.textContent='Enter: Start • Space/↑: Jump/Hold to Float • ← →: Move • P: Pause • S: Sound'; }
 reset();
+function start(){ if(over) reset(); playing=true; paused=false; stateEl.textContent='Playing'; if(SFX.active()) SFX.beep(660,.06,'sine',.03); }
 
-function start(){ if(over) reset(); playing=true; paused=false; stateEl.textContent='Playing'; tipsEl.textContent='Space/↑ Jump • ← → Move • P Pause • S Sound'; SFX.beep(660,.06,'sine',.03); }
-
-// Collision helpers
+// Collisions
 const rectOverlap=(a,b)=> a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
 
-// Drawing helpers
-function RRect(x,y,w,h,r,fill,stroke,shadow){
-  ctx.save();
-  if(shadow){ ctx.shadowColor=shadow.color; ctx.shadowBlur=shadow.blur; }
-  ctx.beginPath();
-  ctx.moveTo(x+r,y);
-  ctx.arcTo(x+w,y, x+w,y+h, r);
-  ctx.arcTo(x+w,y+h, x,y+h, r);
-  ctx.arcTo(x,y+h, x,y, r);
-  ctx.arcTo(x,y, x+w,y, r);
-  ctx.closePath();
-  if(fill){ ctx.fillStyle=fill; ctx.fill(); }
-  if(stroke){ ctx.lineWidth=2; ctx.strokeStyle=stroke; ctx.stroke(); }
-  ctx.restore();
-}
+// Draw helpers
+function RRect(x,y,w,h,r,fill,stroke){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); if(fill){ctx.fillStyle=fill; ctx.fill();} if(stroke){ctx.lineWidth=2; ctx.strokeStyle=stroke; ctx.stroke();} }
 
-function drawElephant(p){
+function drawEle(p){ // cute cartoon elephant
+  // shadow
+  ctx.globalAlpha=.25; ctx.beginPath(); ctx.ellipse(p.x+p.w*.5, groundY+6, p.w*.38, 8, 0, 0, Math.PI*2); ctx.fillStyle='#000'; ctx.fill(); ctx.globalAlpha=1;
   // body
   RRect(p.x, p.y, p.w, p.h, 18, '#BFD9FF', '#8EB6FF');
   // ear
-  RRect(p.x+8, p.y+8, 22, 22, 10, '#D3E5FF', '#9FC0FF');
+  RRect(p.x+10, p.y+8, 24, 24, 12, '#D6E6FF', '#9DBFFF');
   // eye
-  ctx.fillStyle = '#0b0f2a'; ctx.beginPath(); ctx.arc(p.x+p.w-18, p.y+18, 4, 0, Math.PI*2); ctx.fill();
-  // cheek blush
-  ctx.fillStyle = 'rgba(255,160,180,.45)'; ctx.beginPath(); ctx.arc(p.x+22, p.y+26, 6, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0b1027'; ctx.beginPath(); ctx.arc(p.x+p.w-18, p.y+16, 4, 0, Math.PI*2); ctx.fill();
+  // blush
+  ctx.fillStyle='rgba(255,160,180,.5)'; ctx.beginPath(); ctx.arc(p.x+26, p.y+22, 6, 0, Math.PI*2); ctx.fill();
   // trunk
-  RRect(p.x+p.w-14, p.y+20, 16, 18, 6, '#BFD9FF', '#8EB6FF');
-  // legs
-  RRect(p.x+10, p.y+p.h-10, 16, 10, 5, '#A9C8FF');
-  RRect(p.x+32, p.y+p.h-10, 16, 10, 5, '#A9C8FF');
+  RRect(p.x+p.w-16, p.y+18, 16, 18, 6, '#BFD9FF', '#8EB6FF');
+  // little feet
+  RRect(p.x+10, p.y+p.h-10, 16, 10, 5, '#A9C8FF'); RRect(p.x+34, p.y+p.h-10, 16, 10, 5, '#A9C8FF');
 }
 
-function drawBackground(){
-  // twinkling stars
-  for(const s of stars){
-    const tw = (Math.sin((t*0.9)+(s.x*0.03))*.5+.5)*s.tw;
-    ctx.globalAlpha = 0.35 + tw*0.65;
-    ctx.fillStyle = 'white';
-    ctx.beginPath(); ctx.arc(s.x, s.y, s.s, 0, Math.PI*2); ctx.fill();
-  }
-  ctx.globalAlpha=1;
-  // drifting nebula fog
-  for(const f of fogs){
-    const grad = ctx.createRadialGradient(f.x, f.y, 10, f.x, f.y, f.r);
-    grad.addColorStop(0, 'rgba(138,213,255, .20)');
-    grad.addColorStop(1, 'rgba(138,213,255, 0)');
-    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI*2); ctx.fill();
-  }
+function drawSky(){ // stars
+  for(const s of stars){ const tw=(Math.sin((t*0.9)+(s.x*0.03))*.5+.5)*s.tw; ctx.globalAlpha=0.35+tw*0.65; ctx.beginPath(); ctx.arc(s.x,s.y,s.s,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); } ctx.globalAlpha=1;
+  // mist
+  for(const f of fogs){ const grad=ctx.createRadialGradient(f.x,f.y,10,f.x,f.y,f.r); grad.addColorStop(0,'rgba(167,217,255,.20)'); grad.addColorStop(1,'rgba(167,217,255,0)'); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,Math.PI*2); ctx.fill(); }
+  // far trees (parallax)
+  for(const tr of farTrees){ ctx.fillStyle='#142a4e'; ctx.fillRect(tr.x, tr.y, tr.w, tr.h); ctx.beginPath(); ctx.arc(tr.x+tr.w/2, tr.y-4, tr.w*1.3, 0, Math.PI*2); ctx.fillStyle='rgba(108,180,255,.12)'; ctx.fill(); }
 }
 
-function drawGround(){
-  ctx.fillStyle = '#16285a'; ctx.fillRect(0, groundY, W, H-groundY);
-  ctx.fillStyle = '#1e3574'; ctx.fillRect(0, groundY-4, W, 4);
+function drawGround(){ ctx.fillStyle='#132b52'; ctx.fillRect(0, groundY, W, H-groundY); ctx.fillStyle='#1a3a6f'; ctx.fillRect(0, groundY-4, W, 4); }
+
+function drawTree(tre){ // trunk
+  const x=tre.x,y=tre.y,w=tre.w,h=tre.h; RRect(x,y,w,h,6,'#274b6e','#1c3450');
+  // glowing canopy
+  const cx0=x+w/2, cy0=y-6, r=tre.canopyR; const grad=ctx.createRadialGradient(cx0,cy0,4,cx0,cy0,r);
+  grad.addColorStop(0,'rgba(138,213,255,.9)'); grad.addColorStop(1,'rgba(138,213,255,0)'); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(cx0,cy0,r,0,Math.PI*2); ctx.fill();
 }
 
-function drawPillar(p){
-  const x=p.x, y=p.y, w=p.w, h=p.h;
-  // glow base
-  RRect(x-4, y-6, w+8, h+12, 10, 'rgba(138,213,255, .08)', 'rgba(138,213,255,.15)', {color:'rgba(138,213,255,.9)', blur:p.glow});
-  // neon core
-  const grad = ctx.createLinearGradient(x, y, x, y+h);
-  grad.addColorStop(0,'#a9e6ff'); grad.addColorStop(1,'#5bc7ff');
-  RRect(x, y, w, h, 8, grad, '#7fd9ff');
-  // sparkles
-  ctx.fillStyle='rgba(255,255,255,.6)';
-  for(let i=0;i<3;i++){ ctx.fillRect(x+rand(3,w-3), y+rand(2,h-2), 1.5, 1.5); }
-}
+function drawSpark(s){ const g=ctx.createRadialGradient(s.x,s.y,0.5,s.x,s.y,8); g.addColorStop(0,'rgba(255,232,163,1)'); g.addColorStop(1,'rgba(255,232,163,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(s.x,s.y,8,0,Math.PI*2); ctx.fill(); }
 
-function drawFly(f){
-  const g = ctx.createRadialGradient(f.x, f.y, 0.5, f.x, f.y, 8);
-  g.addColorStop(0,'rgba(255, 232, 163, 1)');
-  g.addColorStop(1,'rgba(255, 232, 163, 0)');
-  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(f.x, f.y, 8, 0, Math.PI*2); ctx.fill();
-  ctx.globalAlpha=1;
-}
-
-function drawUI(){
-  // subtle courage bar could be added here; currently score on HUD only
-  if(!playing && !over) drawStart();
-  if(paused && playing && !over) drawPause();
-  if(over) drawOver();
-}
-
-function drawStart(){
-  ctx.save(); ctx.textAlign='center';
-  ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(W*.08,H*.16,W*.84,H*.5);
-  ctx.fillStyle='#fff'; ctx.font='800 44px system-ui, Arial'; ctx.fillText("Elephant’s Dream", W/2, H*.30);
-  ctx.font='400 20px system-ui, Arial';
-  const lines=[
-    'A baby-blue elephant in a dreamy world…',
-    'Use ← → to move, Space/↑ to jump. Avoid the glowing pillars.',
-    'Comfortable keyboard feel with coyote time (you can still jump just after the edge).',
-  ];
-  lines.forEach((ln,i)=>ctx.fillText(ln, W/2, H*.38 + i*28));
-  ctx.font='700 20px system-ui, Arial'; ctx.fillStyle='#FFD166';
-  ctx.fillText('Press Enter to Begin • S to enable sound', W/2, H*.60);
-  ctx.restore();
-}
-
-function drawPause(){
-  ctx.save(); ctx.textAlign='center';
-  ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#fff'; ctx.font='800 36px system-ui, Arial'; ctx.fillText('Paused', W/2, H/2);
-  ctx.font='400 18px system-ui, Arial'; ctx.fillText('Press P to resume', W/2, H/2+28);
-  ctx.restore();
-}
-
-function drawOver(){
-  ctx.save(); ctx.textAlign='center';
-  ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(W*.08,H*.20,W*.84,H*.46);
-  ctx.fillStyle='#fff'; ctx.font='800 40px system-ui, Arial'; ctx.fillText('Dream Again?', W/2, H*.36);
-  ctx.font='400 20px system-ui, Arial';
-  ctx.fillText(`Final Score: ${Math.floor(score)}`, W/2, H*.43);
-  ctx.fillText('Sometimes impossible takes a little courage.', W/2, H*.49);
-  ctx.fillStyle='#FFD166'; ctx.font='700 20px system-ui, Arial';
-  ctx.fillText('Press Enter to Restart', W/2, H*.57);
-  ctx.restore();
-}
+function drawUI(){ if(!playing&&!over) drawStart(); if(paused&&playing&&!over) drawPause(); if(over) drawOver(); }
+function drawStart(){ ctx.save(); ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(W*.08,H*.16,W*.84,H*.5); ctx.fillStyle='#fff'; ctx.font='800 44px system-ui, Arial'; ctx.fillText('Elephant Runner', W/2, H*.30); ctx.font='400 20px system-ui, Arial'; const lines=['Baby-blue elephant in a dreamy forest.','Jump over trees • Hold jump to float gently.','Collect starlight, avoid the trunks.']; lines.forEach((ln,i)=>ctx.fillText(ln,W/2,H*.38+i*28)); ctx.font='700 20px system-ui, Arial'; ctx.fillStyle='#ffd166'; ctx.fillText('Press Enter to Begin • S to enable sound', W/2, H*.60); ctx.restore(); }
+function drawPause(){ ctx.save(); ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#fff'; ctx.font='800 36px system-ui, Arial'; ctx.fillText('Paused', W/2, H/2); ctx.font='400 18px system-ui, Arial'; ctx.fillText('Press P to resume', W/2, H/2+28); ctx.restore(); }
+function drawOver(){ ctx.save(); ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(W*.08,H*.20,W*.84,H*.46); ctx.fillStyle='#fff'; ctx.font='800 40px system-ui, Arial'; ctx.fillText('Dream Again?', W/2, H*.36); ctx.font='400 20px system-ui, Arial'; ctx.fillText(`Final Score: ${Math.floor(score)}`, W/2, H*.43); ctx.fillText('Hold jump to float above the trees ✨', W/2, H*.49); ctx.fillStyle='#ffd166'; ctx.font='700 20px system-ui, Arial'; ctx.fillText('Press Enter to Restart', W/2, H*.57); ctx.restore(); }
 
 // Update
-function update(now){
-  if(!last) last=now; dt = Math.min(0.033, (now-last)/1000); last=now; t += dt;
-  if(!playing || paused || over) return;
+function update(now){ if(!last) last=now; dt=Math.min(.033,(now-last)/1000); last=now; t+=dt; if(!playing||paused||over) return;
+  // bg drift
+  for(const f of fogs){ f.x -= f.v*dt; if(f.x < -f.r) { f.x=W+f.r; f.y=rand(40,H*.6);} }
+  for(const tr of farTrees){ tr.x -= (speed*tr.s)*dt; if(tr.x + tr.w < -20){ tr.x=W+20; tr.y=groundY-rand(120,220); tr.h=rand(100,180); tr.w=rand(18,26); tr.s=rand(.3,.6);} }
 
-  // dreamy fog drift
-  for(const f of fogs){ f.x -= f.v*dt; if(f.x < -f.r) { f.x = W + f.r; f.y = rand(40,H*0.6);} }
-
-  // spawn cadence
-  spawnTimer -= dt; if(spawnTimer<=0){ spawnPillar(); spawnTimer = rand(0.95, 1.5) * (240/worldSpeed); }
-  flyTimer -= dt; if(flyTimer<=0){ spawnFly(); flyTimer = rand(0.9, 1.6); }
+  // spawners
+  spawnTree -= dt; if(spawnTree<=0){ addTree(); spawnTree=rand(.9,1.4)*(250/speed); }
+  spawnSpark -= dt; if(spawnSpark<=0){ addSpark(); spawnSpark=rand(.9,1.6); }
 
   // move world
-  for(let i=pillars.length-1;i>=0;i--){ const p=pillars[i]; p.x -= worldSpeed*dt; if(p.x + p.w < -10) pillars.splice(i,1); }
-  for(let i=flies.length-1;i>=0;i--){ const f=flies[i]; f.x -= worldSpeed*dt*0.9; f.t += dt; f.y += Math.sin(f.t*3)*0.15; if(f.x < -12) flies.splice(i,1); }
+  for(let i=trees.length-1;i>=0;i--){ const tr=trees[i]; tr.x -= speed*dt; if(tr.x + tr.w < -12) trees.splice(i,1); }
+  for(let i=sparks.length-1;i>=0;i--){ const sp=sparks[i]; sp.x -= speed*dt*.95; sp.t += dt; sp.y += Math.sin(sp.t*3)*.15; if(sp.x < -12) sparks.splice(i,1); }
 
-  // horizontal input with acceleration
-  const target = (keys.left?-1:0) + (keys.right?1:0);
-  if(target!==0){ ele.vx = clamp(ele.vx + target*ele.acc*dt, -ele.maxSpeed, ele.maxSpeed); }
-  else {
-    // decelerate to 0 quickly
-    if(Math.abs(ele.vx) < 10) ele.vx = 0; else ele.vx += (ele.vx>0?-1:1)*ele.decel*dt;
+  // input -> horizontal accel
+  const dir=(keys.left?-1:0)+(keys.right?1:0); if(dir!==0){ ele.vx=clamp(ele.vx+dir*ele.acc*dt,-ele.maxSpeed,ele.maxSpeed); } else { if(Math.abs(ele.vx)<10) ele.vx=0; else ele.vx+= (ele.vx>0?-1:1)*ele.decel*dt; }
+  ele.x = clamp(ele.x + ele.vx*dt, 60, ele.maxX);
+
+  // gravity & float
+  const wantJump = (performance.now()-jumpPressedAt) <= 120; // buffer
+  if(wantJump && (ele.onGround || (performance.now()-ele.coyote)<=ele.coyoteTime)){
+    ele.vy = ele.jumpVel; ele.onGround=false; ele.jumping=true; jumpPressedAt=-1; if(SFX.active()) SFX.beep(960,.07,'triangle',.035);
   }
-  ele.x = clamp(ele.x + ele.vx*dt, 60, W*0.65);
+  // apply gravity (reduced while holding jump -> float)
+  const g = keys.jump && !ele.onGround && ele.vy < 120 ? ele.floatG : ele.gravity; // float when holding
+  ele.vy += g*dt; ele.y += ele.vy*dt;
+  if(ele.y+ele.h >= groundY){ ele.y=groundY-ele.h; ele.vy=0; if(!ele.onGround){ ele.onGround=true; ele.jumping=false; } }
+  else { if(ele.onGround){ ele.onGround=false; ele.coyote=performance.now(); } }
 
-  // gravity
-  ele.vy += ele.gravity*dt; ele.y += ele.vy*dt;
-  if(ele.y+ele.h >= groundY){ ele.y = groundY-ele.h; ele.vy = 0; if(!ele.onGround){ ele.onGround=true; ele.jumping=false; }
-  } else { if(ele.onGround){ ele.onGround=false; ele.coyote = performance.now(); } }
+  // collisions with trees (use a slightly inset hitbox)
+  for(const tr of trees){ if(rectOverlap({x:ele.x+8,y:ele.y+6,w:ele.w-16,h:ele.h-10}, tr)){ if(!over){ if(SFX.active()) SFX.beep(220,.25,'sawtooth',.07); over=true; playing=false; stateEl.textContent='Game Over'; best=Math.max(best,Math.floor(score)); localStorage.setItem('ele-run-best',best); bestEl.textContent='Best: '+best; } } if(!tr.hit && tr.x+tr.w < ele.x){ tr.hit=true; score += 8; if(SFX.active()) SFX.beep(620,.05,'sine',.025); } }
 
-  // jump buffer use + coyote time
-  const nowMs = performance.now();
-  const canCoyote = (nowMs - ele.coyote) <= ele.coyoteTime; // just left ground
-  const buffered = (nowMs - jumpPressedAt) <= ele.jumpBufTime;
-  if(buffered && (ele.onGround || canCoyote)){
-    // variable jump: stronger if standing still
-    ele.vy = ele.jumpVel; ele.onGround=false; ele.jumping=true; jumpPressedAt = -1; if(SFX.active()) SFX.beep(960,.07,'triangle',.035);
-  }
-  // variable-height jump (release early to cut)
-  if(!keys.jump && ele.jumping && ele.vy < -80){ ele.vy = Math.max(ele.vy, -160); ele.jumping=false; }
-
-  // collisions
-  for(const p of pillars){
-    if(rectOverlap({x:ele.x+8,y:ele.y+6,w:ele.w-16,h:ele.h-10}, p)){
-      if(!over){ if(SFX.active()) SFX.beep(220,.25,'sawtooth',.07); over=true; playing=false; stateEl.textContent='Game Over'; best=Math.max(best, Math.floor(score)); localStorage.setItem('elephant_best', best); bestEl.textContent='Best: '+best; }
-    }
-    // scoring when you pass a pillar
-    if(!p.hit && p.x + p.w < ele.x){ p.hit=true; score += 10; if(SFX.active()) SFX.beep(620,.05,'sine',.025); }
-  }
-
-  // fireflies collect (bonus)
-  for(let i=flies.length-1;i>=0;i--){ const f=flies[i];
-    if(Math.hypot((f.x-ele.x-ele.w/2), (f.y-ele.y-ele.h/2)) < 28){ score += 3; if(SFX.active()) SFX.beep(880,.04,'sine',.02); flies.splice(i,1); }
-  }
+  // collect stars
+  for(let i=sparks.length-1;i>=0;i--){ const sp=sparks[i]; if(Math.hypot(sp.x-(ele.x+ele.w/2), sp.y-(ele.y+ele.h/2)) < 28){ score += 3; if(SFX.active()) SFX.beep(820,.04,'sine',.02); sparks.splice(i,1); } }
 
   // difficulty
-  worldSpeed = clamp(worldSpeed + 6*dt, 220, 420);
-  score += (worldSpeed/240) * dt; // time-based drip
-  scoreEl.textContent = 'Score: ' + Math.floor(score);
+  speed=clamp(speed+6*dt,250,430); score += (speed/250)*dt; scoreEl.textContent='Score: '+Math.floor(score);
 }
 
 // Render
-function render(){
-  ctx.clearRect(0,0,W,H);
-  drawBackground();
-  drawGround();
-  // draw entities
-  for(const f of flies) drawFly(f);
-  for(const p of pillars) drawPillar(p);
-  drawElephant(ele);
-  drawUI();
-}
+function render(){ ctx.clearRect(0,0,W,H); drawSky(); drawGround(); for(const tr of trees) drawTree(tr); for(const sp of sparks) drawSpark(sp); drawEle(ele); drawUI(); }
 
-function loop(now=0){ if(!paused) update(now); render(); requestAnimationFrame(loop); }
-requestAnimationFrame(loop);
+function loop(now=0){ if(!paused) update(now); render(); requestAnimationFrame(loop); } requestAnimationFrame(loop);
 
-// mouse/touch start
-c.addEventListener('click', ()=>{ if(!playing||over) start(); else paused=!paused; stateEl.textContent = paused? 'Paused' : 'Playing'; });
-
+// Click to start/pause
+c.addEventListener('click',()=>{ if(!playing||over) start(); else { paused=!paused; stateEl.textContent=paused?'Paused':'Playing'; } });
 </script>
 </body>
 </html>
