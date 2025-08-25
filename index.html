@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Baby Blue Elephant Cupcake Run</title>
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(to bottom, #e6f2ff, #ffe6f2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    canvas {
+      background: transparent;
+      border: 4px solid #fff;
+      border-radius: 16px;
+      box-shadow: 0 0 20px rgba(200,200,200,0.8);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="480" height="640"></canvas>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Baby blue elephant sprite
+    const elephantImg = new Image();
+    elephantImg.src = "https://i.ibb.co/vkSM9Nf/blue-baby-elephant.png"; // 🐘💙
+
+    // Cupcake sprite
+    const cupcakeImg = new Image();
+    cupcakeImg.src = "https://i.ibb.co/L5wYVzp/cute-cupcake.png"; // 🧁
+
+    // Elephant object
+    let elephant = { x: 80, y: canvas.height/2, width: 60, height: 60 };
+    let gravity = 0.5;
+    let velocity = 0;
+    let jump = -8;
+
+    // Game state
+    let pillars = [];
+    let collectibles = [];
+    let frame = 0;
+    let score = 0;
+    let lives = 3;
+    let pillarCount = 0;
+    let gameOver = false;
+
+    // Controls
+    document.addEventListener("keydown", flap);
+    document.addEventListener("click", flap);
+    function flap() {
+      if (!gameOver) velocity = jump;
+    }
+
+    function drawElephant() {
+      ctx.drawImage(elephantImg, elephant.x, elephant.y, elephant.width, elephant.height);
+    }
+
+    function drawPillar(p) {
+      ctx.fillStyle = "rgba(192,192,192,0.9)";
+      ctx.shadowColor = "#fff";
+      ctx.shadowBlur = 10;
+      // top
+      ctx.fillRect(p.x, 0, 60, p.topHeight);
+      // bottom
+      ctx.fillRect(p.x, canvas.height - p.bottomHeight, 60, p.bottomHeight);
+      ctx.shadowBlur = 0; // reset glow
+    }
+
+    function drawCupcake(item) {
+      ctx.drawImage(cupcakeImg, item.x, item.y, 40, 40);
+    }
+
+    function update() {
+      if (gameOver) {
+        ctx.fillStyle = "#ff4081";
+        ctx.font = "bold 36px Arial";
+        ctx.fillText("Game Over!", canvas.width/2 - 100, canvas.height/2);
+        ctx.font = "20px Arial";
+        ctx.fillText("Score: " + score, canvas.width/2 - 40, canvas.height/2 + 40);
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Elephant physics
+      velocity += gravity;
+      elephant.y += velocity;
+
+      // Prevent going off screen
+      if (elephant.y + elephant.height > canvas.height) elephant.y = canvas.height - elephant.height;
+      if (elephant.y < 0) elephant.y = 0;
+
+      drawElephant();
+
+      // Spawn pillars
+      if (frame % 90 === 0) {
+        let topHeight = Math.random() * (canvas.height/2);
+        let gap = 150;
+        let bottomHeight = canvas.height - topHeight - gap;
+        pillars.push({ x: canvas.width, topHeight, bottomHeight });
+      }
+
+      // Update pillars
+      for (let i = 0; i < pillars.length; i++) {
+        let p = pillars[i];
+        p.x -= 3;
+        drawPillar(p);
+
+        // Collision
+        if (
+          elephant.x < p.x + 60 &&
+          elephant.x + elephant.width > p.x &&
+          (elephant.y < p.topHeight || elephant.y + elephant.height > canvas.height - p.bottomHeight)
+        ) {
+          lives--;
+          if (lives <= 0) {
+            gameOver = true;
+          } else {
+            elephant.y = canvas.height/2;
+            velocity = 0;
+          }
+        }
+
+        // Remove off screen pillar
+        if (p.x + 60 < 0) {
+          pillars.splice(i, 1);
+          i--;
+          score++;
+          pillarCount++;
+
+          // Every 10 pillars → spawn cupcake
+          if (pillarCount % 10 === 0) {
+            collectibles.push({
+              x: canvas.width,
+              y: Math.random() * (canvas.height - 100) + 50,
+              caught: false
+            });
+          }
+        }
+      }
+
+      // Update cupcakes
+      for (let i = 0; i < collectibles.length; i++) {
+        let item = collectibles[i];
+        item.x -= 3;
+        drawCupcake(item);
+
+        // Collision check
+        if (!item.caught &&
+            elephant.x < item.x + 40 &&
+            elephant.x + elephant.width > item.x &&
+            elephant.y < item.y + 40 &&
+            elephant.y + elephant.height > item.y) {
+          item.caught = true;
+          lives++;
+        }
+
+        // Remove off screen
+        if (item.x + 40 < 0) {
+          collectibles.splice(i, 1);
+          i--;
+        }
+      }
+
+      // Score & lives
+      ctx.fillStyle = "#333";
+      ctx.font = "20px Arial";
+      ctx.fillText("Score: " + score, 20, 30);
+      ctx.fillText("Lives: " + lives, 20, 60);
+
+      frame++;
+      requestAnimationFrame(update);
+    }
+
+    update();
+  </script>
+</body>
+</html>
