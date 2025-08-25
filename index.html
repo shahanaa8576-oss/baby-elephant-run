@@ -1,467 +1,353 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Elephant’s Dream 🐘</title>
-<meta name="description" content="A tiny emotional web game about a baby elephant that learns to jump." />
-<style>
-  :root {
-    --bg1:#0b1220; --bg2:#182847; --accent:#ffd166; --soft:#a1c9ff; --ui:#ffffff;
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; background: linear-gradient(180deg, var(--bg1), var(--bg2)); color: var(--ui); font-family: Inter, system-ui, Arial, sans-serif; }
-  #wrap { display: grid; place-items: center; height: 100%; padding: 16px; }
-  canvas { width: min(100vw, 800px); height: calc(min(100vw, 800px) * 0.6); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.4); display:block; background:#0e1630; }
-  .hud {
-    position: fixed; inset: 12px auto auto 12px; display:flex; gap:10px; align-items:center; user-select:none; pointer-events:none;
-  }
-  .badge { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); padding: 6px 10px; border-radius: 999px; font-size: 13px; }
-  .right { right: 12px; left:auto; }
-  #mobileControls {
-    position: fixed; inset: auto 0 18px 0; display: flex; justify-content: center; gap: 16px; pointer-events: auto;
-  }
-  .btn {
-    width: 72px; height: 72px; border-radius: 16px; background: rgba(255,255,255,.08);
-    border: 1px solid rgba(255,255,255,.15); backdrop-filter: blur(6px);
-    display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size: 14px; touch-action: manipulation;
-  }
-  .btn:active { transform: scale(.97); }
-  .sr-only { position: absolute; left:-9999px; }
-  @media (min-width: 900px) { #mobileControls { display:none; } }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Elephant’s Dream 🐘</title>
+  <meta name="description" content="A tiny but polished runner about a cartoon baby elephant in a dreamy world with glowing pillars." />
+  <style>
+    :root{
+      --baby-blue:#BFD9FF; /* baby elephant base */
+      --baby-blue-dark:#8EB6FF;
+      --line:#4A6DDA;
+      --glow:#8AD5FF;
+      --star:#FFE8A3;
+      --bg-top:#0b0f2a;
+      --bg-mid:#1a2150;
+      --bg-bottom:#291a4a;
+      --ui:#FFFFFF;
+      --danger:#FF7B7B;
+      --accent:#FFD166;
+    }
+    html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 65% 20%, rgba(120,90,255,.25), transparent 60%),
+                                     linear-gradient(180deg,var(--bg-top),var(--bg-mid) 55%,var(--bg-bottom));
+               color:var(--ui);font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;}
+    #wrap{display:grid;place-items:center;height:100%;padding:16px}
+    canvas{width:min(100vw, 960px);height:calc(min(100vw, 960px)*0.6);display:block;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.6);background:transparent}
+    .hud{position:fixed;inset:12px auto auto 12px;display:flex;gap:10px;align-items:center;user-select:none;pointer-events:none}
+    .right{left:auto;right:12px}
+    .badge{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);backdrop-filter:blur(6px);padding:6px 12px;border-radius:999px;font-size:13px}
+    .btnbar{position:fixed;left:0;right:0;bottom:18px;display:flex;justify-content:center;gap:16px}
+    .btn{width:72px;height:72px;border-radius:16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}
+    @media (min-width:900px){.btnbar{display:none}}
+  </style>
 </head>
 <body>
-<div id="wrap">
-  <canvas id="game" width="960" height="576" aria-label="Elephant's Dream Game"></canvas>
-</div>
-
-<!-- HUD -->
-<div class="hud">
-  <div class="badge" id="scoreBadge">Score: 0</div>
-  <div class="badge" id="streakBadge">Courage: 0%</div>
-</div>
-<div class="hud right">
-  <div class="badge" id="hintBadge">Press Enter / Tap to Start • P to Pause</div>
-</div>
-
-<!-- Mobile controls -->
-<div id="mobileControls" aria-hidden="false">
-  <button class="btn" id="leftBtn" aria-label="Move left">◀︎</button>
-  <button class="btn" id="jumpBtn" aria-label="Jump">⤴︎</button>
-  <button class="btn" id="rightBtn" aria-label="Move right">▶︎</button>
-</div>
+  <div id="wrap"><canvas id="game" width="960" height="576" aria-label="Elephant's Dream Game"></canvas></div>
+  <div class="hud">
+    <div class="badge" id="scoreB">Score: 0</div>
+    <div class="badge" id="bestB">Best: 0</div>
+    <div class="badge" id="tipsB">Enter to Start • Space/↑ to Jump • ← → to Move • P Pause • S Sound</div>
+  </div>
+  <div class="hud right"><div class="badge" id="stateB">Ready</div></div>
+  <div class="btnbar" id="mobileCtl">
+    <button class="btn" id="leftBtn">◀︎</button>
+    <button class="btn" id="jumpBtn">⤴︎</button>
+    <button class="btn" id="rightBtn">▶︎</button>
+  </div>
 
 <script>
-/* -------------------------------------------
-   Elephant’s Dream 🐘 – by Shahana Shirin
-   Single-file HTML5 canvas game (no libraries)
-   How to play:
-   - Move: ← → or A / D (mobile buttons too)
-   - Jump: Space / W / ↑ (unlocks mid-game!)
-   - Start / Restart: Enter or tap
-   - Pause: P
--------------------------------------------- */
+/* ----------------------------------------------------
+   Elephant’s Dream – polished runner with dreamy vibes
+   - Cute BABY BLUE cartoon elephant
+   - Dreamy parallax sky, twinkling stars, nebula fog
+   - Glowing PILLARS as obstacles (soft neon)
+   - Smooth keyboard feel (coyote time + jump buffer)
+   - Mobile on-screen buttons, pause, sound toggle
+   - High score saved locally
+---------------------------------------------------- */
+const W = 960, H = 576; // internal resolution (CSS scales it)
+const c = document.getElementById('game');
+const ctx = c.getContext('2d', { alpha:true });
+const scoreEl = document.getElementById('scoreB');
+const bestEl  = document.getElementById('bestB');
+const tipsEl  = document.getElementById('tipsB');
+const stateEl = document.getElementById('stateB');
 
-const canvas = document.getElementById('game');
-const cx = canvas.getContext('2d', { alpha:false });
-const scoreEl = document.getElementById('scoreBadge');
-const streakEl = document.getElementById('streakBadge');
-const hintEl = document.getElementById('hintBadge');
-
-const W = canvas.width, H = canvas.height;
-let last = 0, dt = 0, t = 0, playing = false, paused = false, gameOver = false;
-let unlockMomentShown = false;
-
-const keys = { left:false, right:false, jump:false };
-let mobile = false;
-
-// Simple audio (no files): oscillator beeps
-const Audio = (() => {
-  let ctx;
-  function ensure(){ if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
-  function beep(freq=440, time=0.07, type='sine', gain=0.04) {
-    const c = ensure();
-    const o = c.createOscillator();
-    const g = c.createGain();
-    o.type = type; o.frequency.value = freq;
-    g.gain.value = gain;
-    o.connect(g); g.connect(c.destination);
-    o.start();
-    o.stop(c.currentTime + time);
-  }
-  return { beep };
+// Audio: tiny oscillator beeps (no external files)
+const SFX = (()=>{ let ac; const ensure=()=>ac||(ac=new (window.AudioContext||window.webkitAudioContext)());
+  function beep(f=440,t=.08,type='sine',g=.05){const a=ensure();const o=a.createOscillator();const gn=a.createGain();o.type=type;o.frequency.value=f;gn.gain.value=g;o.connect(gn);gn.connect(a.destination);o.start();o.stop(a.currentTime+t);} 
+  return { beep, on(){ensure()}, active(){return !!ac} };
 })();
 
-// World
-const gravity = 2200;
-let speed = 220;           // world scroll speed
-let score = 0;
-let courage = 0;           // 0..100 (%). At 100, the Elephant can jump!
-let distance = 0;
-
-const groundY = H*0.78;
-const lanes = [groundY-20]; // for possible future steps
-
-// Parallax background layers
-const clouds = [];
-for (let i=0;i<10;i++) {
-  clouds.push({ x: Math.random()*W, y: Math.random()*H*0.4, r: 20+Math.random()*60, v: 8+Math.random()*18, a: 0.15+Math.random()*0.15 });
-}
-
-// Player (Elephant)
-const player = {
-  x: 140, y: groundY-60, vx:0, vy:0, w:72, h:56,
-  canJump:false, onGround:true, tilt:0, alive:true
-};
-
-// Obstacles & Orbs
-const rocks = [];
-const orbs = [];
-
-function resetGame() {
-  playing = false; paused = false; gameOver = false; t = 0; dt = 0; last = 0;
-  unlockMomentShown = false;
-  speed = 220; score = 0; courage = 0; distance = 0;
-  player.x = 140; player.y = groundY-60; player.vx = 0; player.vy = 0; player.canJump = false; player.onGround = true; player.alive = true;
-  rocks.length = 0; orbs.length = 0;
-}
-
-resetGame();
-
-// Utility
-const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
-const rand = (a,b)=>a+Math.random()*(b-a);
-
-// Spawners
-let rockTimer = 0, orbTimer = 0;
-
-function spawnRock() {
-  const h = rand(26, 42);
-  rocks.push({ x: W + rand(0, 80), y: groundY-h, w: rand(28, 48), h, passed:false });
-}
-function spawnOrb() {
-  orbs.push({ x: W + rand(0, 60), y: groundY - 110 - rand(0,60), r: 10, v: rand(30, 60) });
-}
+// Helpers
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rand=(a,b)=>a+Math.random()*(b-a);
+const chance=p=>Math.random()<p;
 
 // Input
-window.addEventListener('keydown', (e)=>{
-  if (e.repeat) return;
-  if (e.key === 'ArrowLeft' || e.key.toLowerCase()==='a') keys.left = true;
-  if (e.key === 'ArrowRight' || e.key.toLowerCase()==='d') keys.right = true;
-  if (['ArrowUp',' ','w','W'].includes(e.key)) keys.jump = true;
-  if (e.key === 'Enter') { if (!playing || gameOver) startGame(); }
-  if (e.key.toLowerCase() === 'p') paused = !paused;
+const keys = {left:false,right:false,jump:false};
+let jumpPressedAt = -1; // jump buffer timer
+let paused=false, playing=false, over=false;
+
+window.addEventListener('keydown', e=>{
+  if(e.repeat) return;
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a') keys.left=true;
+  if(k==='arrowright'||k==='d') keys.right=true;
+  if(k===' '||k==='arrowup'||k==='w') { keys.jump=true; jumpPressedAt = performance.now(); }
+  if(k==='enter') { if(!playing||over) start(); }
+  if(k==='p') { if(playing&&!over) paused=!paused; stateEl.textContent = paused? 'Paused' : 'Playing'; }
+  if(k==='s') { SFX.on(); SFX.beep(880,.05,'triangle',.03); tipsEl.textContent='Sound on ✓'; setTimeout(()=>tipsEl.textContent='Space/↑ Jump • ← → Move • P Pause • S Sound',1200); }
 });
-window.addEventListener('keyup', (e)=>{
-  if (e.key === 'ArrowLeft' || e.key.toLowerCase()==='a') keys.left = false;
-  if (e.key === 'ArrowRight' || e.key.toLowerCase()==='d') keys.right = false;
-  if (['ArrowUp',' ','w','W'].includes(e.key)) keys.jump = false;
+window.addEventListener('keyup', e=>{
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a') keys.left=false;
+  if(k==='arrowright'||k==='d') keys.right=false;
+  if(k===' '||k==='arrowup'||k==='w') keys.jump=false;
 });
 
-// Mobile controls
-const leftBtn = document.getElementById('leftBtn');
-const rightBtn = document.getElementById('rightBtn');
-const jumpBtn = document.getElementById('jumpBtn');
-['touchstart','mousedown'].forEach(evt=>{
-  leftBtn.addEventListener(evt, ()=>keys.left = true);
-  rightBtn.addEventListener(evt, ()=>keys.right = true);
-  jumpBtn.addEventListener(evt, ()=>keys.jump = true);
+// Mobile buttons
+const leftBtn=document.getElementById('leftBtn');
+const rightBtn=document.getElementById('rightBtn');
+const jumpBtn=document.getElementById('jumpBtn');
+['mousedown','touchstart'].forEach(ev=>{
+  leftBtn.addEventListener(ev,()=>keys.left=true); rightBtn.addEventListener(ev,()=>keys.right=true); jumpBtn.addEventListener(ev,()=>{keys.jump=true; jumpPressedAt=performance.now();});
 });
-['touchend','mouseup','mouseleave'].forEach(evt=>{
-  leftBtn.addEventListener(evt, ()=>keys.left = false);
-  rightBtn.addEventListener(evt, ()=>keys.right = false);
-  jumpBtn.addEventListener(evt, ()=>keys.jump = false);
+['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=>{
+  leftBtn.addEventListener(ev,()=>keys.left=false); rightBtn.addEventListener(ev,()=>keys.right=false); jumpBtn.addEventListener(ev,()=>keys.jump=false);
 });
-function detectMobile() {
-  mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  document.getElementById('mobileControls').style.display = mobile ? 'flex' : '';
-}
-detectMobile();
 
-// Start & Restart
-canvas.addEventListener('click', ()=>{
-  if (!playing || gameOver) startGame();
-});
-function startGame() {
-  if (gameOver) resetGame();
-  playing = true; paused = false;
-  hintEl.textContent = 'P to Pause • Unlock Jump by collecting Courage';
-  Audio.beep(740, .08, 'sine', .03);
-}
+// Game state
+const groundY = H*0.78;
+let t=0, last=0, dt=0;
+let worldSpeed = 220; // scroll speed
+let score=0; let best=+localStorage.getItem('elephant_best')||0;
 
-// Physics & Collision
-function rectsOverlap(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
-function circleRectOverlap(c, r) {
-  const testX = clamp(c.x, r.x, r.x+r.w);
-  const testY = clamp(c.y, r.y, r.y+r.h);
-  const dx = c.x - testX, dy = c.y - testY;
-  return (dx*dx + dy*dy) < (c.r*c.r);
-}
+// Stars & fog for dreamy bg
+const stars = Array.from({length:120},()=>({x:rand(0,W),y:rand(0,H*0.7),s:rand(0.5,1.8), tw:rand(0.2,0.8)}));
+const fogs = Array.from({length:6},()=>({x:rand(0,W),y:rand(40,H*0.6),r:rand(120,240),v:rand(4,10),a:rand(0.05,0.12)}));
 
-// Draw helpers
-function drawRoundedRect(x,y,w,h,r,fill,stroke) {
-  cx.beginPath();
-  cx.moveTo(x+r, y);
-  cx.arcTo(x+w, y,   x+w, y+h, r);
-  cx.arcTo(x+w, y+h, x,   y+h, r);
-  cx.arcTo(x,   y+h, x,   y,   r);
-  cx.arcTo(x,   y,   x+w, y,   r);
-  cx.closePath();
-  if (fill) { cx.fillStyle = fill; cx.fill(); }
-  if (stroke){ cx.strokeStyle = stroke; cx.lineWidth = 2; cx.stroke(); }
+// Player: baby elephant (cartoon), baby blue
+const ele = { x:140, y:groundY-64, w:78, h:56, vx:0, vy:0, onGround:true, canJump:true,
+              maxSpeed:260, acc:1800, decel:2200, jumpVel:-760, gravity:2000,
+              coyote:0, coyoteTime:90, jumpBuf:0, jumpBufTime:110, jumping:false };
+
+// Obstacles: glowing pillars
+const pillars = []; let spawnTimer=0;
+function spawnPillar(){
+  // random gap height, pillar width, with glow
+  const w = rand(22, 34);
+  const h = rand(50, 120);
+  const y = groundY - h;
+  pillars.push({ x:W + rand(0,80), y, w, h, glow: rand(6, 14), hit:false });
 }
 
-function drawElephant(p) {
+// Cute collectible fireflies (bonus points, light)
+const flies = []; let flyTimer=0;
+function spawnFly(){ flies.push({x:W+rand(0,60), y:rand(groundY-160, groundY-80), r:3.5, a:rand(0.5,1), t:0}); }
+
+function reset(){
+  t=0; last=0; dt=0; score=0; worldSpeed=220; over=false; playing=false; paused=false;
+  pillars.length=0; flies.length=0;
+  ele.x=140; ele.y=groundY-64; ele.vx=0; ele.vy=0; ele.onGround=true; ele.coyote=0; ele.jumpBuf=0; ele.jumping=false;
+  spawnTimer=0; flyTimer=0;
+  stateEl.textContent='Ready'; scoreEl.textContent='Score: 0'; bestEl.textContent='Best: '+best;
+}
+reset();
+
+function start(){ if(over) reset(); playing=true; paused=false; stateEl.textContent='Playing'; tipsEl.textContent='Space/↑ Jump • ← → Move • P Pause • S Sound'; SFX.beep(660,.06,'sine',.03); }
+
+// Collision helpers
+const rectOverlap=(a,b)=> a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
+
+// Drawing helpers
+function RRect(x,y,w,h,r,fill,stroke,shadow){
+  ctx.save();
+  if(shadow){ ctx.shadowColor=shadow.color; ctx.shadowBlur=shadow.blur; }
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y, x+w,y+h, r);
+  ctx.arcTo(x+w,y+h, x,y+h, r);
+  ctx.arcTo(x,y+h, x,y, r);
+  ctx.arcTo(x,y, x+w,y, r);
+  ctx.closePath();
+  if(fill){ ctx.fillStyle=fill; ctx.fill(); }
+  if(stroke){ ctx.lineWidth=2; ctx.strokeStyle=stroke; ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawElephant(p){
   // body
-  drawRoundedRect(p.x, p.y, p.w, p.h, 16, '#9bb7ff', '#6686ff');
+  RRect(p.x, p.y, p.w, p.h, 18, '#BFD9FF', '#8EB6FF');
   // ear
-  drawRoundedRect(p.x+8, p.y+10, 20, 20, 10, '#b9cdff', '#8aa6ff');
+  RRect(p.x+8, p.y+8, 22, 22, 10, '#D3E5FF', '#9FC0FF');
   // eye
-  cx.fillStyle = '#0b1220';
-  cx.beginPath(); cx.arc(p.x + p.w - 18, p.y + 18, 4, 0, Math.PI*2); cx.fill();
+  ctx.fillStyle = '#0b0f2a'; ctx.beginPath(); ctx.arc(p.x+p.w-18, p.y+18, 4, 0, Math.PI*2); ctx.fill();
+  // cheek blush
+  ctx.fillStyle = 'rgba(255,160,180,.45)'; ctx.beginPath(); ctx.arc(p.x+22, p.y+26, 6, 0, Math.PI*2); ctx.fill();
   // trunk
-  drawRoundedRect(p.x + p.w - 16, p.y + 20, 16, 18, 6, '#9bb7ff', '#6686ff');
+  RRect(p.x+p.w-14, p.y+20, 16, 18, 6, '#BFD9FF', '#8EB6FF');
   // legs
-  drawRoundedRect(p.x+8, p.y+p.h-10, 14, 10, 4, '#8aa6ff', null);
-  drawRoundedRect(p.x+28, p.y+p.h-10, 14, 10, 4, '#8aa6ff', null);
+  RRect(p.x+10, p.y+p.h-10, 16, 10, 5, '#A9C8FF');
+  RRect(p.x+32, p.y+p.h-10, 16, 10, 5, '#A9C8FF');
 }
 
-function drawGround() {
-  cx.fillStyle = '#1a2a52';
-  cx.fillRect(0, groundY+20, W, H-groundY-20);
-  // horizon line
-  cx.fillStyle = '#20335f';
-  cx.fillRect(0, groundY, W, 4);
-}
-
-function drawSky() {
-  // gradient already via canvas bg, add parallax clouds
-  for (const cl of clouds) {
-    cx.globalAlpha = cl.a;
-    cx.beginPath();
-    cx.arc(cl.x, cl.y, cl.r, 0, Math.PI*2);
-    cx.arc(cl.x+cl.r*0.8, cl.y+cl.r*0.2, cl.r*0.8, 0, Math.PI*2);
-    cx.arc(cl.x-cl.r*0.7, cl.y+cl.r*0.3, cl.r*0.6, 0, Math.PI*2);
-    cx.fillStyle = '#ffffff';
-    cx.fill();
+function drawBackground(){
+  // twinkling stars
+  for(const s of stars){
+    const tw = (Math.sin((t*0.9)+(s.x*0.03))*.5+.5)*s.tw;
+    ctx.globalAlpha = 0.35 + tw*0.65;
+    ctx.fillStyle = 'white';
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.s, 0, Math.PI*2); ctx.fill();
   }
-  cx.globalAlpha = 1;
-}
-
-function drawRocks() {
-  for (const r of rocks) {
-    cx.fillStyle = '#2a3e74';
-    drawRoundedRect(r.x, r.y, r.w, r.h, 6, '#2a3e74', '#1e3160');
+  ctx.globalAlpha=1;
+  // drifting nebula fog
+  for(const f of fogs){
+    const grad = ctx.createRadialGradient(f.x, f.y, 10, f.x, f.y, f.r);
+    grad.addColorStop(0, 'rgba(138,213,255, .20)');
+    grad.addColorStop(1, 'rgba(138,213,255, 0)');
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI*2); ctx.fill();
   }
 }
 
-function drawOrbs() {
-  for (const o of orbs) {
-    const grad = cx.createRadialGradient(o.x, o.y, 2, o.x, o.y, o.r);
-    grad.addColorStop(0, 'rgba(255, 209, 102,1)');
-    grad.addColorStop(1, 'rgba(255, 209, 102,0)');
-    cx.fillStyle = grad;
-    cx.beginPath(); cx.arc(o.x, o.y, o.r, 0, Math.PI*2); cx.fill();
-  }
+function drawGround(){
+  ctx.fillStyle = '#16285a'; ctx.fillRect(0, groundY, W, H-groundY);
+  ctx.fillStyle = '#1e3574'; ctx.fillRect(0, groundY-4, W, 4);
 }
 
-function drawUI() {
-  // Courage meter (on canvas for drama)
-  const barW = 260, barH = 10, x = W/2 - barW/2, y = 22;
-  cx.fillStyle = 'rgba(255,255,255,.2)';
-  drawRoundedRect(x, y, barW, barH, 6, 'rgba(255,255,255,.15)');
-  cx.fillStyle = '#ffd166';
-  drawRoundedRect(x, y, barW * (courage/100), barH, 6, '#ffd166');
-  // unlock message
-  if (player.canJump && !unlockMomentShown && playing) {
-    cx.font = '700 28px system-ui, Arial';
-    cx.fillStyle = '#ffd166';
-    cx.textAlign = 'center';
-    cx.fillText('✨ Courage unlocked: You can JUMP! Press ↑ or TAP ⤴︎', W/2, 64);
-  }
+function drawPillar(p){
+  const x=p.x, y=p.y, w=p.w, h=p.h;
+  // glow base
+  RRect(x-4, y-6, w+8, h+12, 10, 'rgba(138,213,255, .08)', 'rgba(138,213,255,.15)', {color:'rgba(138,213,255,.9)', blur:p.glow});
+  // neon core
+  const grad = ctx.createLinearGradient(x, y, x, y+h);
+  grad.addColorStop(0,'#a9e6ff'); grad.addColorStop(1,'#5bc7ff');
+  RRect(x, y, w, h, 8, grad, '#7fd9ff');
+  // sparkles
+  ctx.fillStyle='rgba(255,255,255,.6)';
+  for(let i=0;i<3;i++){ ctx.fillRect(x+rand(3,w-3), y+rand(2,h-2), 1.5, 1.5); }
 }
 
-// Game Loop
-function update(frameTime) {
-  if (!last) last = frameTime;
-  dt = Math.min(0.033, (frameTime - last)/1000);
-  last = frameTime;
-  if (!playing || paused) return;
+function drawFly(f){
+  const g = ctx.createRadialGradient(f.x, f.y, 0.5, f.x, f.y, 8);
+  g.addColorStop(0,'rgba(255, 232, 163, 1)');
+  g.addColorStop(1,'rgba(255, 232, 163, 0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(f.x, f.y, 8, 0, Math.PI*2); ctx.fill();
+  ctx.globalAlpha=1;
+}
 
-  t += dt; distance += speed*dt;
+function drawUI(){
+  // subtle courage bar could be added here; currently score on HUD only
+  if(!playing && !over) drawStart();
+  if(paused && playing && !over) drawPause();
+  if(over) drawOver();
+}
 
-  // parallax clouds
-  for (const cl of clouds) {
-    cl.x -= cl.v * dt;
-    if (cl.x < -100) { cl.x = W + 60; cl.y = Math.random()*H*0.45; cl.r = 20+Math.random()*60; cl.v = 8+Math.random()*18; }
+function drawStart(){
+  ctx.save(); ctx.textAlign='center';
+  ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(W*.08,H*.16,W*.84,H*.5);
+  ctx.fillStyle='#fff'; ctx.font='800 44px system-ui, Arial'; ctx.fillText("Elephant’s Dream", W/2, H*.30);
+  ctx.font='400 20px system-ui, Arial';
+  const lines=[
+    'A baby-blue elephant in a dreamy world…',
+    'Use ← → to move, Space/↑ to jump. Avoid the glowing pillars.',
+    'Comfortable keyboard feel with coyote time (you can still jump just after the edge).',
+  ];
+  lines.forEach((ln,i)=>ctx.fillText(ln, W/2, H*.38 + i*28));
+  ctx.font='700 20px system-ui, Arial'; ctx.fillStyle='#FFD166';
+  ctx.fillText('Press Enter to Begin • S to enable sound', W/2, H*.60);
+  ctx.restore();
+}
+
+function drawPause(){
+  ctx.save(); ctx.textAlign='center';
+  ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#fff'; ctx.font='800 36px system-ui, Arial'; ctx.fillText('Paused', W/2, H/2);
+  ctx.font='400 18px system-ui, Arial'; ctx.fillText('Press P to resume', W/2, H/2+28);
+  ctx.restore();
+}
+
+function drawOver(){
+  ctx.save(); ctx.textAlign='center';
+  ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(W*.08,H*.20,W*.84,H*.46);
+  ctx.fillStyle='#fff'; ctx.font='800 40px system-ui, Arial'; ctx.fillText('Dream Again?', W/2, H*.36);
+  ctx.font='400 20px system-ui, Arial';
+  ctx.fillText(`Final Score: ${Math.floor(score)}`, W/2, H*.43);
+  ctx.fillText('Sometimes impossible takes a little courage.', W/2, H*.49);
+  ctx.fillStyle='#FFD166'; ctx.font='700 20px system-ui, Arial';
+  ctx.fillText('Press Enter to Restart', W/2, H*.57);
+  ctx.restore();
+}
+
+// Update
+function update(now){
+  if(!last) last=now; dt = Math.min(0.033, (now-last)/1000); last=now; t += dt;
+  if(!playing || paused || over) return;
+
+  // dreamy fog drift
+  for(const f of fogs){ f.x -= f.v*dt; if(f.x < -f.r) { f.x = W + f.r; f.y = rand(40,H*0.6);} }
+
+  // spawn cadence
+  spawnTimer -= dt; if(spawnTimer<=0){ spawnPillar(); spawnTimer = rand(0.95, 1.5) * (240/worldSpeed); }
+  flyTimer -= dt; if(flyTimer<=0){ spawnFly(); flyTimer = rand(0.9, 1.6); }
+
+  // move world
+  for(let i=pillars.length-1;i>=0;i--){ const p=pillars[i]; p.x -= worldSpeed*dt; if(p.x + p.w < -10) pillars.splice(i,1); }
+  for(let i=flies.length-1;i>=0;i--){ const f=flies[i]; f.x -= worldSpeed*dt*0.9; f.t += dt; f.y += Math.sin(f.t*3)*0.15; if(f.x < -12) flies.splice(i,1); }
+
+  // horizontal input with acceleration
+  const target = (keys.left?-1:0) + (keys.right?1:0);
+  if(target!==0){ ele.vx = clamp(ele.vx + target*ele.acc*dt, -ele.maxSpeed, ele.maxSpeed); }
+  else {
+    // decelerate to 0 quickly
+    if(Math.abs(ele.vx) < 10) ele.vx = 0; else ele.vx += (ele.vx>0?-1:1)*ele.decel*dt;
   }
+  ele.x = clamp(ele.x + ele.vx*dt, 60, W*0.65);
 
-  // spawn cadence scales with speed
-  rockTimer -= dt; orbTimer -= dt;
-  if (rockTimer <= 0) { spawnRock(); rockTimer = rand(0.9, 1.6) * (220/speed); }
-  if (orbTimer <= 0)  { spawnOrb();  orbTimer  = rand(0.6, 1.2) * (220/speed); }
+  // gravity
+  ele.vy += ele.gravity*dt; ele.y += ele.vy*dt;
+  if(ele.y+ele.h >= groundY){ ele.y = groundY-ele.h; ele.vy = 0; if(!ele.onGround){ ele.onGround=true; ele.jumping=false; }
+  } else { if(ele.onGround){ ele.onGround=false; ele.coyote = performance.now(); } }
 
-  // move world entities
-  for (let i=rocks.length-1;i>=0;i--) {
-    const r = rocks[i];
-    r.x -= speed*dt;
-    if (r.x + r.w < -10) rocks.splice(i,1);
+  // jump buffer use + coyote time
+  const nowMs = performance.now();
+  const canCoyote = (nowMs - ele.coyote) <= ele.coyoteTime; // just left ground
+  const buffered = (nowMs - jumpPressedAt) <= ele.jumpBufTime;
+  if(buffered && (ele.onGround || canCoyote)){
+    // variable jump: stronger if standing still
+    ele.vy = ele.jumpVel; ele.onGround=false; ele.jumping=true; jumpPressedAt = -1; if(SFX.active()) SFX.beep(960,.07,'triangle',.035);
   }
-  for (let i=orbs.length-1;i>=0;i--) {
-    const o = orbs[i];
-    o.x -= (speed*dt) * 1.02;
-    o.y += Math.sin((t*2 + o.x*0.01))*0.3; // float
-    if (o.x + o.r < -10) orbs.splice(i,1);
-  }
-
-  // player horizontal
-  let move = 0;
-  if (keys.left)  move -= 1;
-  if (keys.right) move += 1;
-  player.vx = move * 260;
-  player.x = clamp(player.x + player.vx*dt, 40, W*0.6);
-
-  // ground / gravity
-  player.vy += gravity*dt;
-  player.y += player.vy*dt;
-  if (player.y + player.h >= groundY) {
-    player.y = groundY - player.h;
-    player.vy = 0;
-    player.onGround = true;
-  } else player.onGround = false;
-
-  // jump (only when unlocked)
-  if (keys.jump && player.onGround && player.canJump) {
-    player.vy = -780;
-    Audio.beep(960, .08, 'triangle', .03);
-    unlockMomentShown = true; // hide the banner after first jump
-  }
+  // variable-height jump (release early to cut)
+  if(!keys.jump && ele.jumping && ele.vy < -80){ ele.vy = Math.max(ele.vy, -160); ele.jumping=false; }
 
   // collisions
-  for (let i=rocks.length-1;i>=0;i--) {
-    const r = rocks[i];
-    if (rectsOverlap({x:player.x, y:player.y, w:player.w, h:player.h}, r)) {
-      player.alive = false;
-      gameOver = true; playing = false;
-      Audio.beep(200, .25, 'sawtooth', .06);
-      hintEl.textContent = 'Press Enter / Tap to Try Again';
-    } else if (!r.passed && r.x + r.w < player.x) {
-      r.passed = true; score += 10; // passing obstacles gives score
-      Audio.beep(600, .06, 'sine', .02);
+  for(const p of pillars){
+    if(rectOverlap({x:ele.x+8,y:ele.y+6,w:ele.w-16,h:ele.h-10}, p)){
+      if(!over){ if(SFX.active()) SFX.beep(220,.25,'sawtooth',.07); over=true; playing=false; stateEl.textContent='Game Over'; best=Math.max(best, Math.floor(score)); localStorage.setItem('elephant_best', best); bestEl.textContent='Best: '+best; }
     }
+    // scoring when you pass a pillar
+    if(!p.hit && p.x + p.w < ele.x){ p.hit=true; score += 10; if(SFX.active()) SFX.beep(620,.05,'sine',.025); }
   }
 
-  for (let i=orbs.length-1;i>=0;i--) {
-    const o = orbs[i];
-    if (circleRectOverlap({x:o.x,y:o.y,r:o.r}, {x:player.x,y:player.y,w:player.w,h:player.h})) {
-      courage = clamp(courage + 6, 0, 100);
-      score += 5;
-      orbs.splice(i,1);
-      Audio.beep(880, .06, 'sine', .025);
-    }
+  // fireflies collect (bonus)
+  for(let i=flies.length-1;i>=0;i--){ const f=flies[i];
+    if(Math.hypot((f.x-ele.x-ele.w/2), (f.y-ele.y-ele.h/2)) < 28){ score += 3; if(SFX.active()) SFX.beep(880,.04,'sine',.02); flies.splice(i,1); }
   }
 
-  // unlock jump when courage full
-  if (!player.canJump && courage >= 100) {
-    player.canJump = true;
-    // celebratory chime
-    Audio.beep(660,.07,'sine',.03); setTimeout(()=>Audio.beep(880,.08,'sine',.03),90); setTimeout(()=>Audio.beep(1100,.09,'sine',.03),190);
-  }
-
-  // difficulty scaling
-  if (player.canJump) {
-    speed = clamp(speed + 10*dt, 220, 410);
-  } else {
-    // pre-unlock: gentle speed up
-    speed = clamp(speed + 4*dt, 220, 300);
-  }
-
-  // UI text mirrors
-  scoreEl.textContent = `Score: ${score}`;
-  streakEl.textContent = `Courage: ${Math.round(courage)}%`;
+  // difficulty
+  worldSpeed = clamp(worldSpeed + 6*dt, 220, 420);
+  score += (worldSpeed/240) * dt; // time-based drip
+  scoreEl.textContent = 'Score: ' + Math.floor(score);
 }
 
 // Render
-function render() {
-  // clear
-  cx.fillStyle = '#0e1630'; cx.fillRect(0,0,W,H);
-  drawSky();
+function render(){
+  ctx.clearRect(0,0,W,H);
+  drawBackground();
   drawGround();
-  drawRocks();
-  drawOrbs();
-  drawElephant(player);
+  // draw entities
+  for(const f of flies) drawFly(f);
+  for(const p of pillars) drawPillar(p);
+  drawElephant(ele);
   drawUI();
-
-  if (!playing && !gameOver) drawStartScreen();
-  if (paused && playing) drawPause();
-  if (gameOver) drawGameOver();
 }
 
-function drawStartScreen() {
-  cx.save();
-  cx.textAlign = 'center';
-  cx.fillStyle = 'rgba(0,0,0,.35)';
-  cx.fillRect(W*0.08, H*0.14, W*0.84, H*0.56);
-  cx.fillStyle = '#ffffff';
-  cx.font = '800 44px system-ui, Arial';
-  cx.fillText('Elephant’s Dream', W/2, H*0.30);
-  cx.font = '400 20px system-ui, Arial';
-  const lines = [
-    '“When I was a kid, I wondered why elephants can’t jump.”',
-    'Help a little elephant find the courage to do the impossible.',
-    '',
-    'Collect ✨ orbs to fill Courage. Avoid rocks.',
-    'When Courage reaches 100%, you unlock JUMP.'
-  ];
-  lines.forEach((ln,i)=>cx.fillText(ln, W/2, H*0.37 + i*28));
+function loop(now=0){ if(!paused) update(now); render(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
 
-  cx.font = '700 20px system-ui, Arial';
-  cx.fillStyle = '#ffd166';
-  cx.fillText('Press Enter / Tap to Begin', W/2, H*0.62);
-  cx.restore();
-}
-
-function drawPause() {
-  cx.save();
-  cx.textAlign = 'center';
-  cx.fillStyle = 'rgba(0,0,0,.45)';
-  cx.fillRect(0,0,W,H);
-  cx.fillStyle = '#ffffff';
-  cx.font = '700 32px system-ui, Arial';
-  cx.fillText('Paused', W/2, H/2);
-  cx.font = '400 18px system-ui, Arial';
-  cx.fillText('Press P to resume', W/2, H/2 + 30);
-  cx.restore();
-}
-
-function drawGameOver() {
-  cx.save();
-  cx.textAlign = 'center';
-  cx.fillStyle = 'rgba(0,0,0,.55)';
-  cx.fillRect(W*0.08, H*0.2, W*0.84, H*0.46);
-  cx.fillStyle = '#ffffff';
-  cx.font = '800 40px system-ui, Arial';
-  cx.fillText('Dream Again?', W/2, H*0.36);
-  cx.font = '400 20px system-ui, Arial';
-  cx.fillText(`Final Score: ${score}`, W/2, H*0.43);
-  cx.fillText('Every “impossible” starts with a small step.', W/2, H*0.48);
-  cx.fillStyle = '#ffd166';
-  cx.font = '700 20px system-ui, Arial';
-  cx.fillText('Press Enter / Tap to Restart', W/2, H*0.56);
-  cx.restore();
-}
-
-// Main RAF
-function loop(now=0) {
-  if (!paused) update(now);
-  render();
-  requestAnimationFrame(loop);
-}
-loop();
-
-// Resize handling (keeps internal resolution stable; CSS scales)
-window.addEventListener('resize', ()=>{ /* CSS handles visual size */ });
+// mouse/touch start
+c.addEventListener('click', ()=>{ if(!playing||over) start(); else paused=!paused; stateEl.textContent = paused? 'Paused' : 'Playing'; });
 
 </script>
 </body>
